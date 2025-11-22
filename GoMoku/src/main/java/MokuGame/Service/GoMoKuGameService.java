@@ -1,18 +1,21 @@
 package MokuGame.Service;
 
 import MokuGame.Core.GoMokuBoard;
-import org.slf4j.Logger;                // instead of writing  System.out.println("Game started"), we use logger;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Service class that manages GoMoku game logic including move validation,
+ * turn management, and win detection.
+ */
 public class GoMoKuGameService {
-
+    
     private static final Logger logger = LoggerFactory.getLogger(GoMoKuGameService.class);
-    private static final int win_count = 5;  //5 in a row to win
-    private GoMokuBoard board;  // Called the GoMokuBoard class
-
+    private final GoMokuBoard board;
     private char currentPlayer;
     private boolean gameOver;
     private char winner;
+    private static final int WIN_LENGTH = 5;
 
     /**
      * Creates a new game service with the specified board.
@@ -24,14 +27,13 @@ public class GoMoKuGameService {
         this.currentPlayer = GoMokuBoard.Player1;
         this.gameOver = false;
         this.winner = GoMokuBoard.Empty;
-        logger.info("New game starting..letsgoooo {}x{}", board.getRows(), board.getColumns());
-        // braces inside shows that we have to input two values
+        logger.info("New game service created with {}x{} board", board.getRows(), board.getColumns());
     }
 
     /**
      * Gets the current game board.
      *
-     * @return the board
+     * @return the game board
      */
     public GoMokuBoard getBoard() {
         return board;
@@ -40,92 +42,85 @@ public class GoMoKuGameService {
     /**
      * Gets the current player.
      *
-     * @return the current player character
+     * @return the current player character ('X' or 'O')
      */
     public char getCurrentPlayer() {
         return currentPlayer;
     }
 
     /**
+     * Checks if the game is over.
+     *
+     * @return true if the game has ended, false otherwise
+     */
+    public boolean isGameOver() {
+        return gameOver;
+    }
+
+    /**
      * Gets the winner of the game.
      *
-     * @return returns the winner
+     * @return the winning player character, or '.' if no winner yet
      */
     public char getWinner() {
         return winner;
     }
 
-    public boolean isGameOver() {                 // when the game is over
-        return gameOver;
-    }
-
     /**
-     * To check if a move is legal.
-     * the move is valid and the cell is empty.
+     * Attempts to make a move at the specified position.
      *
      * @param row the row index
-     * @param column the column index
-     * @return true if the move is valid, false otherwise
+     * @param col the column index
+     * @return true if the move was valid and made, false otherwise
      */
-    public boolean isValidMove(int row, int column) {
-        if (!board.isValidPosition(row, column)) {
-            logger.debug("Invalid: position ({}, {}) is out of bounds", row, column);
-            return false;
-        }
-        if (!board.isEmpty(row, column)) {
-            logger.debug("Invalid : position ({}, {}) is already occupied", row, column);
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Makes a move at the specified position for the current player.
-     *
-     * @param row the row index
-     * @param column the column index
-     * @return true if the move was successful, false otherwise
-     */
-    public boolean makeMove(int row, int column) {
+    public boolean makeMove(int row, int col) {
         if (gameOver) {
-            logger.warn("game is already over");
+            logger.warn("Attempted move after game over");
             return false;
         }
 
-        if (!isValidMove(row, column)) {
-            logger.warn("Invalid move attempted by player {} at ({}, {})", currentPlayer, row, column);
+        if (!board.isValidPosition(row, col)) {
+            logger.warn("Invalid position: ({}, {})", row, col);
             return false;
         }
-        board.setCell(row, column, currentPlayer);
-        logger.info("Player {} placed at ({}, {})", currentPlayer, row, column);
 
-        if (checkWin(row, column)) {
+        if (!board.isEmpty(row, col)) {
+            logger.warn("Position ({}, {}) already occupied", row, col);
+            return false;
+        }
+
+        board.setCell(row, col, currentPlayer);
+        logger.info("Player {} placed at ({}, {})", currentPlayer, row, col);
+
+        if (checkWin(row, col)) {
             gameOver = true;
             winner = currentPlayer;
-            logger.info("Game over! Player {} wins!", winner);
-            return true;
-        }
-        if (isBoardFull()) {
+            logger.info("Player {} wins!", currentPlayer);
+        } else if (isBoardFull()) {
             gameOver = true;
-            logger.info("Game over! Board is full - it's a draw!");
-            return true;
+            logger.info("Game ended in a draw");
+        } else {
+            switchPlayer();
         }
 
-        switchPlayer();
         return true;
     }
 
+    /**
+     * Switches the current player.
+     */
     private void switchPlayer() {
-        currentPlayer = (currentPlayer == GoMokuBoard.Player1) ? GoMokuBoard.Player2 : GoMokuBoard.Player1;
-        logger.debug("Current player switched to {}", currentPlayer);
+        currentPlayer = (currentPlayer == GoMokuBoard.Player1) 
+            ? GoMokuBoard.Player2 
+            : GoMokuBoard.Player1;
     }
 
     /**
      * Checks if the board is completely full.
      *
-     * @return true if the board is full, false otherwise
+     * @return true if no empty cells remain, false otherwise
      */
-    public boolean isBoardFull() {
+    private boolean isBoardFull() {
         for (int i = 0; i < board.getRows(); i++) {
             for (int j = 0; j < board.getColumns(); j++) {
                 if (board.isEmpty(i, j)) {
@@ -136,90 +131,76 @@ public class GoMoKuGameService {
         return true;
     }
 
-
     /**
      * Checks if the last move at the specified position resulted in a win.
      *
      * @param row the row of the last move
-     * @param column the column of the last move
-     * @return true if the move resulted in a win, else false
+     * @param col the column of the last move
+     * @return true if this move wins the game, false otherwise
      */
-
-    public boolean checkWin(int row, int column) {
-        char player = board.getCell(row, column);
-
-        if (countDirection(row, column, 0, 1, player) +
-                countDirection(row, column, 0, -1, player) + 1 >= win_count) {
-            logger.debug("A win: horizontal line for player {}", player);
-            return true;
-        }
-        if (countDirection(row, column, 1, 0, player) +
-                countDirection(row, column, -1, 0, player) + 1 >= win_count) {
-            logger.debug("A win: vertical line for player {}", player);
-            return true;
-        }
-        if (countDirection(row, column, 1, 1, player) +
-                countDirection(row, column, -1, -1, player) + 1 >= win_count) {
-            logger.debug("A win: diagonal line for player {}", player);
-            return true;
-        }
-        if (countDirection(row, column, 1, -1, player) +
-                countDirection(row, column, -1, 1, player) + 1 >= win_count) {
-            logger.debug("A win: anti-diagonal line for player {}", player);
-            return true;
-        }
-        return false;
+    private boolean checkWin(int row, int col) {
+        char player = board.getCell(row, col);
+        
+        return checkDirection(row, col, 0, 1, player) ||  // Horizontal
+               checkDirection(row, col, 1, 0, player) ||  // Vertical
+               checkDirection(row, col, 1, 1, player) ||  // Diagonal \
+               checkDirection(row, col, 1, -1, player);   // Diagonal /
     }
 
     /**
-     * Counts how many of the player's stones are lined up in one direction.
+     * Checks if there are 5 or more consecutive pieces in a specific direction.
      *
-     * Imagine you just placed an X. This method looks left, right, up, down,
-     * or diagonally — one way at a time — and counts: "1, 2, 3, 4, 5...!"
-     * It stops counting when it hits an empty spot or the opponent's stone.
-     *
-     * We use it to check: "Did this move make 5 in a row? → WIN!"
-     *
-     * @param row           where we just placed the stone
-     * @param column        where we just placed the stone
-     * @param deltaRow      which way are we looking? (up/down/straight)
-     * @param deltaColumn   which way are we looking? (left/right/straight)
-     * @param player        'X' or 'O' — whose stones are we counting?
-     * @return              how many stones in a row in that direction
+     * @param row the starting row
+     * @param col the starting column
+     * @param dRow the row direction (-1, 0, or 1)
+     * @param dCol the column direction (-1, 0, or 1)
+     * @param player the player to check for
+     * @return true if 5 or more consecutive pieces found, false otherwise
      */
+    private boolean checkDirection(int row, int col, int dRow, int dCol, char player) {
+        int count = 1; // Count the current piece
+        
+        // Check in positive direction
+        count += countInDirection(row, col, dRow, dCol, player);
+        
+        // Check in negative direction
+        count += countInDirection(row, col, -dRow, -dCol, player);
+        
+        return count >= WIN_LENGTH;
+    }
 
-    private int countDirection(int row, int column, int deltaRow, int deltaColumn, char player) {
+    /**
+     * Counts consecutive pieces in a specific direction from a starting position.
+     *
+     * @param row the starting row
+     * @param col the starting column
+     * @param dRow the row direction
+     * @param dCol the column direction
+     * @param player the player to count for
+     * @return the count of consecutive pieces in that direction
+     */
+    private int countInDirection(int row, int col, int dRow, int dCol, char player) {
         int count = 0;
-        int r = row + deltaRow;
-        int c = column + deltaColumn;
-
+        int r = row + dRow;
+        int c = col + dCol;
+        
         while (board.isValidPosition(r, c) && board.getCell(r, c) == player) {
             count++;
-            r += deltaRow;
-            c += deltaColumn;
+            r += dRow;
+            c += dCol;
         }
+        
         return count;
     }
 
-
-    public void resetGame() {
+    /**
+     * Resets the game to initial state, clearing the board.
+     */
+    public void reset() {
         board.clear();
         currentPlayer = GoMokuBoard.Player1;
         gameOver = false;
         winner = GoMokuBoard.Empty;
         logger.info("Game reset");
-    }
-
-    /**
-     * Sets a new board and starts a new game.
-     *
-     * @param newBoard the new board to use
-     */
-    public void setBoard(GoMokuBoard newBoard) {
-        this.board = newBoard;
-        this.currentPlayer = GoMokuBoard.Player1;
-        this.gameOver = false;
-        this.winner = GoMokuBoard.Empty;
-        logger.info("Board changed to size {}x{}", newBoard.getRows(), newBoard.getColumns());
     }
 }
